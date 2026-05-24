@@ -11,9 +11,13 @@ services:
       - key: CACHE_TTL_HOURS
         value: "24"
       - key: MAX_REVIEWS_PER_PRODUCT
-        value: "100"
+        value: "25"
       - key: SCRAPER_TIMEOUT_MS
-        value: "45000"
+        value: "12000"
+      - key: SCRAPER_TOTAL_TIMEOUT_SECONDS
+        value: "25"
+      - key: SCRAPER_MAX_PAGES
+        value: "2"
       - key: SCRAPER_HEADLESS
         value: "true"
       - key: LOG_LEVEL

@@ -1,5 +1,6 @@
 import logging
 import re
+import asyncio
 from datetime import datetime
 from urllib.parse import urlparse
 from playwright.async_api import async_playwright, Page
@@ -50,11 +51,16 @@ class HepsiburadaScraper:
     async def scrape(self, url: str) -> ProductReviews:
         normalized = normalize_url(url)
         try:
-            return await retry_async(lambda: self._scrape_once(normalized))
+            return await asyncio.wait_for(
+                retry_async(lambda: self._scrape_once(normalized), attempts=1),
+                timeout=self.settings.scraper_total_timeout_seconds,
+            )
         except InvalidProductUrlError:
             raise
         except NoReviewsFoundError:
             raise
+        except asyncio.TimeoutError as exc:
+            raise ScraperError("Yorum analizi zaman aşımına düştü. Daha az yorumla tekrar deneyin veya SCRAPER_TOTAL_TIMEOUT_SECONDS değerini artırın.") from exc
         except Exception as exc:  # noqa: BLE001
             logger.exception("Scrape failed")
             raise ScraperError(f"Yorumlar alınamadı: {exc}") from exc
@@ -62,20 +68,22 @@ class HepsiburadaScraper:
     async def _scrape_once(self, url: str) -> ProductReviews:
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=self.settings.scraper_headless)
-            context = await browser.new_context(locale="tr-TR", user_agent="Mozilla/5.0 YorumlaMCP/1.0")
-            page = await context.new_page()
-            page.set_default_timeout(self.settings.scraper_timeout_ms)
-            warnings: list[str] = []
-            await page.goto(url, wait_until="domcontentloaded")
-            await self._accept_cookies(page)
-            product_name = await self._first_text(page, selectors.PRODUCT_NAME_SELECTORS)
-            seller = await self._first_text(page, selectors.SELLER_SELECTORS)
-            await self._open_reviews(page)
-            reviews = await self._collect_reviews(page, seller, warnings)
-            await browser.close()
-            if not reviews:
-                raise NoReviewsFoundError("Bu ürün için yorum bulunamadı veya yorum alanı okunamadı.")
-            return ProductReviews(url=url, product_name=product_name, seller=seller, reviews=reviews, warnings=warnings)
+            try:
+                context = await browser.new_context(locale="tr-TR", user_agent="Mozilla/5.0 YorumlaMCP/1.0")
+                page = await context.new_page()
+                page.set_default_timeout(self.settings.scraper_timeout_ms)
+                warnings: list[str] = []
+                await page.goto(url, wait_until="domcontentloaded", timeout=self.settings.scraper_timeout_ms)
+                await self._accept_cookies(page)
+                product_name = await self._first_text(page, selectors.PRODUCT_NAME_SELECTORS)
+                seller = await self._first_text(page, selectors.SELLER_SELECTORS)
+                await self._open_reviews(page)
+                reviews = await self._collect_reviews(page, seller, warnings)
+                if not reviews:
+                    raise NoReviewsFoundError("Bu ürün için yorum bulunamadı veya yorum alanı okunamadı.")
+                return ProductReviews(url=url, product_name=product_name, seller=seller, reviews=reviews, warnings=warnings)
+            finally:
+                await browser.close()
 
     async def _accept_cookies(self, page: Page) -> None:
         for text in ["Kabul", "Tümünü Kabul Et", "Tamam"]:
@@ -110,7 +118,7 @@ class HepsiburadaScraper:
     async def _collect_reviews(self, page: Page, seller: str | None, warnings: list[str]) -> list[Review]:
         seen: set[str] = set()
         reviews: list[Review] = []
-        for _ in range(20):
+        for _ in range(self.settings.scraper_max_pages):
             await page.mouse.wheel(0, 3000)
             await page.wait_for_timeout(800)
             cards = []

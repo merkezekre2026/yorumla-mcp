@@ -8,6 +8,10 @@ services:
       PORT: "8000"
       DATABASE_URL: sqlite+aiosqlite:////data/yorumla.db
       MCP_AUTH_TOKEN: change-me
+      MAX_REVIEWS_PER_PRODUCT: "25"
+      SCRAPER_TIMEOUT_MS: "12000"
+      SCRAPER_TOTAL_TIMEOUT_SECONDS: "25"
+      SCRAPER_MAX_PAGES: "2"
       BACKEND_CORS_ORIGINS: http://localhost:3000
     volumes:
       - yorumla-data:/data

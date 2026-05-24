@@ -69,10 +69,19 @@ Anthropic Messages API MCP connector:
 
 Exposed tools:
 
-- `analyze_product_reviews(url)`
-- `get_fake_review_score(url)`
-- `summarize_reviews(url)`
-- `seller_risk_analysis(url)`
+- `analyze_product_reviews(url)` starts an analysis job and returns `job_id` immediately.
+- `get_analysis_result(job_id)` returns `queued`, `running`, `completed`, or `failed`; when completed, the full analysis is in `result`.
+- `get_fake_review_score(url)` returns cached fake score if available, otherwise starts the same background job.
+- `summarize_reviews(url)` returns cached summary if available, otherwise starts the same background job.
+- `seller_risk_analysis(url)` returns cached seller risk if available, otherwise starts the same background job.
+
+Claude usage pattern:
+
+1. Call `analyze_product_reviews(url)`.
+2. Read the returned `job_id`.
+3. Wait a few seconds.
+4. Call `get_analysis_result(job_id)` until `status` is `completed`.
+5. Use `result.purchase_recommendation`, `result.fake_review`, `result.seller_risk`, and `result.summary`.
 
 ## REST API
 

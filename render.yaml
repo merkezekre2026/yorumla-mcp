@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: yorumla-mcp
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:////data/yorumla.db
+      - key: CACHE_TTL_HOURS
+        value: "24"
+      - key: MAX_REVIEWS_PER_PRODUCT
+        value: "100"
+      - key: SCRAPER_TIMEOUT_MS
+        value: "45000"
+      - key: SCRAPER_HEADLESS
+        value: "true"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: MCP_AUTH_TOKEN
+        sync: false
